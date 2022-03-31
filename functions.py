@@ -1,3 +1,5 @@
+import csv
+
 def print_instructions():
 	print('Usage: python3 import2keychain.py /path/to/bitwarden_passwords.csv')
 
@@ -58,3 +60,35 @@ def make_keychain_pw(bw):
 		'Notes': make_notes( bw['name'],  bw['notes'], bw['fields']),
 		'OTPAuth': make_otpauth( bw['login_uri'], bw['login_username'], bw['login_totp'])
 	}
+
+
+def make_keychain(csv_file):
+	keychain = []
+
+	with open(csv_file) as bitwarden_passwords:
+		for bitwarden in csv.DictReader(bitwarden_passwords):
+			bitwarden['login_uri'] = require_url(
+				bitwarden['login_uri'],
+				bitwarden['name']
+			)
+			bitwarden['login_username'] = require_username(
+				bitwarden['login_username'], 
+				bitwarden['name']
+			)
+			bitwarden['login_password'] = require_password(
+				bitwarden['login_password']
+			)
+
+			keychain_pw = make_keychain_pw(bitwarden)
+			keychain.append(keychain_pw)
+
+	return keychain
+
+
+def write_to_csv(keychain):
+	headers = keychain[0].keys()
+
+	with open('keychain_passwords.csv', 'w') as csvfile:
+		writer = csv.DictWriter(csvfile, fieldnames = headers)
+		writer.writeheader()
+		writer.writerows(keychain)
