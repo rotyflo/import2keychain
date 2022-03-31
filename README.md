@@ -34,7 +34,7 @@ brew install python
 
 `cd ~/import2keychain`
 
-1. Run app on each csv file that was exported
+8. Run app on each csv file that was exported
 
 `python3 import2keychain.py /path/to/bitwarden_passwords.csv`
 
