@@ -7,7 +7,8 @@ def print_instructions():
 
 def require_url(url, name):
 	placeholder = f"https://{name.replace(' ', '_').lower()}.save/"
-	return placeholder if url == '' else url
+	http_s = '' if url.startswith(('http://', 'https://')) else 'https://'
+	return placeholder if url == '' else http_s + url
 
 
 def require_username(username, name):
