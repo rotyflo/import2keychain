@@ -1,93 +1,100 @@
 import csv
 import sys
 
-if sys.argv[1] == '--help':
-	print('Usage: python3 app.py /path/to/passwordsbackup.csv')
+instructions = '''Usage: python3 import2keychain.py /path/to/bitwarden_passwords.csv'''
 
-if sys.argv[1].endswith('.csv'):
-	passwords = []
+try:
+	if sys.argv[1].endswith('.csv'):
+		passwords = []
 
-	with open(sys.argv[1]) as data:
-		for dictionary in csv.DictReader(data):
-			bitwarden_passwords = dictionary
+		with open(sys.argv[1]) as bitwarden_passwords:
+			for bitwarden in csv.DictReader(bitwarden_passwords):
+				def require_url(url, name):
+					placeholder = f"https://{name.replace(' ', '_').lower()}.save/"
+					return placeholder if url == '' else url
 
-			# Fix for url undefined
-			if bitwarden_passwords['login_uri'] == '':
-				bitwarden_passwords['login_uri'] = f"https://{bitwarden_passwords['name'].replace(' ', '_').lower()}.save/"
+				def require_username(username, name):
+					return name if username == '' else username
 
-			if bitwarden_passwords['login_username'] == '':
-				bitwarden_passwords['login_username'] = bitwarden_passwords['name']
+				def require_password(password):
+					return ' ' if password == '' else password
 
-			if bitwarden_passwords['login_password'] == '':
-				bitwarden_passwords['login_password'] = ' '
-			
-			# Fix for trailing slash missing bug
-			bitwarden_passwords['login_uri'] = bitwarden_passwords['login_uri'] + '/'
+				def get_slash_indices(url):
+					url = url + '/'
+					return [i for i in range(len(url)) if url[i] == '/']
 
-			def get_slash_indices(url):
-				return [i for i in range(len(url)) if url[i] == '/']
+				def get_site(url):
+					slash_indices = get_slash_indices(url)
+					return url[slash_indices[1] + 1:slash_indices[2]]
 
-			def make_title(url, username):
-				slash_indices = get_slash_indices(url)
-				site = url[slash_indices[1] + 1:slash_indices[2]]
-				return f"{site} ({username})"
+				def make_title(url, username):
+					site = get_site(url)
+					return f"{site} ({username})"
 
-			def make_url(url):
-				slash_indices = get_slash_indices(url)
-				return url[:slash_indices[2] + 1]
+				def make_url(url):
+					slash_indices = get_slash_indices(url)
+					return url[:slash_indices[2] + 1]
 
-			def make_otpauth(url, username, otp):
-				if otp == '': return ''
+				def make_otpauth(url, username, otp):
+					if otp == '': return ''
+					site = get_site(url)
+					user = username.replace(' ', '%20')
+					otpkey = otp.replace(' ', '').upper()
+					return f"otpauth://totp/{site}:{user}?secret={otpkey}&issuer={site}&algorithm=SHA1&digits=6&period=30"
 
-				slash_indices = get_slash_indices(url)
-				site = url[slash_indices[1] + 1:slash_indices[2]]
-				user = username.replace(' ', '%20')
-				otpkey = otp.replace(' ', '').upper()
-				return f"otpauth://totp/{site}:{user}?secret={otpkey}&issuer={site}&algorithm=SHA1&digits=6&period=30"
+				def make_notes(*args):
+					valid_parts = filter(lambda arg: arg != '', args)
+					formatted_parts = map(lambda part: part + '\n\n', valid_parts)
+					return ''.join(formatted_parts)
 
-			def make_notes(name, notes, fields, otp):
-				parts = []
-				if name != '':
-					parts.append(f"{name}\n\n")
-				if notes != '':
-					parts.append(f"{notes}\n\n")
-				if fields != '':
-					parts.append(f"{fields}\n\n")
-				if otp != '':
-					parts.append(f"OTP: {otp}\n\n")
-				if parts == []:
-					return ''
-				else:
-					return ''.join(parts)
+				bitwarden['login_uri'] = require_url(
+					bitwarden['login_uri'],
+					bitwarden['name']
+				)
+				bitwarden['login_username'] = require_username(
+					bitwarden['login_username'], 
+					bitwarden['name']
+				)
+				bitwarden['login_password'] = require_password(
+					bitwarden['login_password']
+				)
 
-			keychain_passwords = {
-				'Title': make_title(bitwarden_passwords['login_uri'], bitwarden_passwords['login_username']),
-				'URL': make_url(bitwarden_passwords['login_uri']),
-				'Username': bitwarden_passwords['login_username'],
-				'Password': bitwarden_passwords['login_password'],
-				'Notes': make_notes(bitwarden_passwords['name'], bitwarden_passwords['notes'], bitwarden_passwords['fields'], bitwarden_passwords['login_totp']),
-				'OTPAuth': make_otpauth(bitwarden_passwords['login_uri'], bitwarden_passwords['login_username'], bitwarden_passwords['login_totp'])
-			}
+				keychain_pw = {
+					'Title': 
+						make_title(
+							bitwarden['login_uri'],
+							bitwarden['login_username']
+						),
+					'URL':
+						make_url(bitwarden['login_uri']),
+					'Username':
+						bitwarden['login_username'],
+					'Password':
+						bitwarden['login_password'],
+					'Notes':
+						make_notes(
+							bitwarden['name'], 
+							bitwarden['notes'],
+							bitwarden['fields']
+						),
+					'OTPAuth': 
+						make_otpauth(
+							bitwarden['login_uri'],
+							bitwarden['login_username'],
+							bitwarden['login_totp']
+						)
+				}
 
-			passwords.append(keychain_passwords)
+				passwords.append(keychain_pw)
+	
+		headers = passwords[0].keys()
+		with open('keychain_pw.csv', 'w') as csvfile:
+			writer = csv.DictWriter(csvfile, fieldnames = headers)
+			writer.writeheader()
+			writer.writerows(passwords)
 
-	backups = {
-		'Title': 'backup.save ( )',
-		'URL': 'https://backup.save/',
-		'Username': 'Backup',
-		'Password': ' ',
-		'Notes': f"{passwords}",
-		'OTPAuth': ''
-	}
+	else:
+		print(instructions)
 
-	passwords.append(backups)
-
-	headers = ['Title', 'URL', 'Username', 'Password', 'Notes', 'OTPAuth']
-
-	with open('keychain_passwords.csv', 'w') as csvfile:
-		writer = csv.DictWriter(csvfile, fieldnames = headers)
-		writer.writeheader()
-		writer.writerows(passwords)
-
-else:
-	print('Usage: python3 app.py /path/to/passwordsbackup.csv')
+except:
+	print(instructions)
