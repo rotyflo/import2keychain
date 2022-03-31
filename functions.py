@@ -1,4 +1,5 @@
 import csv
+from datetime import datetime
 
 def print_instructions():
 	print('Usage: python3 import2keychain.py /path/to/bitwarden_passwords.csv')
@@ -87,8 +88,9 @@ def make_keychain(csv_file):
 
 def write_to_csv(keychain):
 	headers = keychain[0].keys()
+	date = str(datetime.now()).replace('-', '').replace(' ', '').replace('.', '').replace(':', '')
 
-	with open('keychain_passwords.csv', 'w') as csvfile:
+	with open(f"keychain_passwords_{date}.csv", 'w') as csvfile:
 		writer = csv.DictWriter(csvfile, fieldnames = headers)
 		writer.writeheader()
 		writer.writerows(keychain)
